@@ -1,0 +1,32 @@
+{
+  "name": "pw-engine-planetwars",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/app.js",
+  "scripts": {
+    "start": "tsc && node dist/app.js",
+    "build": "tslint --project . && tsc",
+    "lint": "tslint --project .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Project-Wartemis/pw-engine-planetwars.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Project-Wartemis/pw-engine-planetwars/issues"
+  },
+  "homepage": "https://github.com/Project-Wartemis/pw-engine-planetwars#readme",
+  "dependencies": {
+    "typescript-logging": "^0.6.4",
+    "websocket": "^1.0.31"
+  },
+  "devDependencies": {
+    "@types/websocket": "^1.0.0",
+    "tslint": "^6.1.2",
+    "tslint-etc": "^1.10.1",
+    "typescript": "^3.9.3"
+  }
+}
