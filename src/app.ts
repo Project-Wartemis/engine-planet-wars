@@ -1,9 +1,12 @@
 import Game from './game';
 import Connection from './networking/connection';
 import { InviteMessage } from './networking/message';
+import { factory } from './log';
+
+const log = factory.getLogger('App');
 
 let URL = 'https://localhost:8080/socket';
-//const URL = 'https://api.wartemis.com/socket';
+// const URL = 'https://api.wartemis.com/socket';
 
 console.log(process.env.WARTEMIS_ENV);
 if(process.env.WARTEMIS_ENV === 'BUILD') {
@@ -15,5 +18,6 @@ new Connection(URL)
 
 function handleInviteMessage(raw: object): void {
   const message: InviteMessage = Object.assign({} as InviteMessage, raw);
-  new Game(URL + '/' + message.room);
+  const game = new Game(URL + '/' + message.room);
+  log.info(`Started a new game @ ${game.url}`);
 }

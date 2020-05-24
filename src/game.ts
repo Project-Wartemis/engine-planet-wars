@@ -5,16 +5,16 @@ import Army from './game/army';
 import Player from './game/player';
 import State from './game/state';
 import Connection from './networking/connection';
-import { Message, ActionMessage, ErrorMessage, StartMessage, StateMessage } from './networking/message';
+import { ActionMessage, ErrorMessage, StartMessage, StateMessage } from './networking/message';
 
 const log = factory.getLogger('Game');
 
 export default class Game extends Connection {
 
   private turn = 0;
-  private planets: Record<number,Planet> = {};
-  private armies: Record<number,Army[]> = {}; // maps a planet id to a list of armies, only used for fights
-  private players: Record<number,Player> = {};
+  private planets: Map<number, Planet> =  new Map();
+  private armies: Map<number, Army[]> = new Map(); // maps a planet id to a list of armies, only used for fights
+  private players: Map<number, Player> = new Map();
   private queuedMoves: Move[] = [];
   private state: State = {
     players: [],
@@ -33,9 +33,9 @@ export default class Game extends Connection {
 
   private broadcastState(): void {
     const players: number[] = [];
-    for(let id in this.players) {
-      if(!this.players[id].moved) {
-        players.push(+id);
+    for(const player of this.players.values()) {
+      if(!player.moved) {
+        players.push(player.id);
       }
     }
     this.send({
@@ -56,41 +56,40 @@ export default class Game extends Connection {
     const message: StartMessage = Object.assign({} as StartMessage, raw);
 
     // players
-    for(let id of message.players) {
-      this.players[id] = {
+    console.log(message.players);
+    for(const id of message.players) {
+      this.players.set(id, {
         id,
         moved: false,
         dead: false,
-      }
+      } as Player);
     }
 
     // neutral player
-    this.players[0] = {
+    this.players.set(0, {
       id: 0,
-      hasPlanets: false,
       moved: true,
       dead: true,
-    } as Player;
+    } as Player);
 
-    this.planets = [...Array(planetCount).keys()].map(i => ({
-      id: i,
-      name: 'planet'+i,
-      x: Math.random()*width,
-      y: Math.random()*height,
-      player: i < planetCount - message.players.length ? 0 : message.players[planetCount - i - 1],
-      ships: 5,
-    } as Planet));
+    [...Array(planetCount).keys()].forEach(i => {
+      this.planets.set(i, {
+        id: i,
+        name: 'planet' + i,
+        x: Math.random() * width,
+        y: Math.random() * height,
+        player: i < planetCount - message.players.length ? 0 : message.players[planetCount - i - 1],
+        ships: 5,
+      } as Planet);
+    });
 
-    for(let id in this.players) {
-      this.state.players.push(+id);
+    for(const id of this.players.keys()) {
+      this.state.players.push(id);
     }
 
-    for(let id in this.planets) {
-      this.state.planets.push(this.planets[id]);
-    }
-
-    for(let planet of this.state.planets) {
-      this.armies[planet.id] = [];
+    for(const planet of this.planets.values()) {
+      this.state.planets.push(planet);
+      this.armies.set(planet.id, []);
     }
 
     this.broadcastState();
@@ -99,21 +98,25 @@ export default class Game extends Connection {
   private handleActionMessage(raw: object): void {
     try {
       const message: ActionMessage = Object.assign({} as ActionMessage, raw);
+      const player = this.players.get(message.player);
+      if(!player) {
+        return;
+      }
 
-      for(let move of message.action.moves) {
+      for(const move of message.action.moves) {
         if(!this.validateAndFillMove(message.player, move)) {
           continue;
         }
         this.queuedMoves.push(move);
       }
 
-      this.players[message.player].moved = true;
+      player.moved = true;
 
       let playerLeftToMove = false;
-      for(let id in this.players) {
-        if(!this.players[id].dead && !this.players[id].moved) {
+      for(const p of this.players.values()) {
+        if(!p.dead && !p.moved) {
           playerLeftToMove = true;
-          log.info('still a player left to move :/ '+id);
+          log.debug(`still a player left to move: ${p.id}`);
           break;
         }
       }
@@ -130,8 +133,8 @@ export default class Game extends Connection {
       }
 
       let alivePlayerCount = 0;
-      for(let id in this.players) {
-        if(!this.players[id].dead) {
+      for(const p of this.players.values()) {
+        if(!p.dead) {
           alivePlayerCount++;
         }
       }
@@ -154,17 +157,17 @@ export default class Game extends Connection {
     if(move.ships === 0) {
       return false; // cannot send 0 ships
     }
-    if(!this.planets[move.source]) {
+    const source = this.planets.get(move.source);
+    if(!source) {
       return false; // source does not exist
     }
-    const source = this.planets[move.source];
     if(source.player !== player) {
       return false; // not under your command
     }
-    if(!this.planets[move.target]) {
+    const target = this.planets.get(move.target);
+    if(!target) {
       return false; // target does not exist
     }
-    const target = this.planets[move.target];
     if(move.ships > source.ships) {
       return false; // trying to send more than is available
     }
@@ -172,12 +175,12 @@ export default class Game extends Connection {
     const dy = source.y - target.y;
     move.id = this.moveIdCounter++;
     move.player = player;
-    move.turns = Math.ceil(Math.sqrt(dx*dx + dy*dy));
+    move.turns = Math.ceil(Math.sqrt(dx * dx + dy * dy));
     return true;
   }
 
   private processTurn(): void {
-    log.info('processing next turn');
+    log.debug('processing next turn');
     this.turn++;
     // planets
     for(const planet of this.state.planets) {
@@ -202,8 +205,8 @@ export default class Game extends Connection {
       this.processFight(planet);
     }
     // player status updates
-    for(const id in this.players) {
-      this.processPlayer(this.players[id]);
+    for(const player of this.players.values()) {
+      this.processPlayer(player);
     }
   }
 
@@ -215,15 +218,20 @@ export default class Game extends Connection {
   }
 
   private processNewMove(move: Move): void {
-    this.planets[move.source].ships -= move.ships;
+    const source = this.planets.get(move.source);
+    if(!source) {
+      log.error('A move got through that had an invalid source, ignoring but this should be fixed');
+      return;
+    }
+    source.ships -= move.ships;
     this.state.moves.push(move);
   }
 
   private initialiseArmy(planet: Planet): void {
-    this.armies[planet.id] = [{
+    this.armies.set(planet.id, [{
       player: planet.player,
       ships: planet.ships,
-    } as Army];
+    } as Army]);
   }
 
   private processMove(move: Move): void {
@@ -231,11 +239,16 @@ export default class Game extends Connection {
     if(move.turns) {
       return;
     }
-    const match = this.armies[move.target].find(a => a.player === move.player);
+    const armies = this.armies.get(move.target);
+    if(!armies) {
+      log.error(`No armies present on planet ${move.target}, ignoring but this should be fixed`);
+      return;
+    }
+    const match = armies.find(a => a.player === move.player);
     if(match) {
       match.ships += move.ships;
     } else {
-      this.armies[move.target].push({
+      armies.push({
         player: move.player,
         ships: move.ships,
       } as Army);
@@ -243,14 +256,19 @@ export default class Game extends Connection {
   }
 
   private processFight(planet: Planet): void {
-    if(this.armies[planet.id].length < 2) {
-      planet.ships = this.armies[planet.id][0].ships;
-      planet.player = this.armies[planet.id][0].player;
+    const armies = this.armies.get(planet.id);
+    if(!armies) {
+      log.error(`No armies present on planet ${planet.id}, ignoring but this should be fixed`);
       return;
     }
-    this.armies[planet.id].sort((a,b) => b.ships - a.ships);
-    planet.ships = this.armies[planet.id][0].ships - this.armies[planet.id][1].ships;
-    planet.player = planet.ships === 0 ? 0 : this.armies[planet.id][0].player;
+    if(armies.length < 2) {
+      planet.ships = armies[0].ships;
+      planet.player = armies[0].player;
+      return;
+    }
+    armies.sort((a, b) => b.ships - a.ships);
+    planet.ships = armies[0].ships - armies[1].ships;
+    planet.player = planet.ships === 0 ? 0 : armies[0].player;
   }
 
   private processPlayer(player: Player): void {
