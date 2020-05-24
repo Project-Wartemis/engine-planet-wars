@@ -95,4 +95,13 @@ export default class Connection {
     } as RegisterMessage);
   }
 
+  disconnect(): void {
+    this.send({
+      type: 'stop',
+    } as Message);
+    if(this.connection) {
+      this.connection.close();
+    }
+  }
+
 }

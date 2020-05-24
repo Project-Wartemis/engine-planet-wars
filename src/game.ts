@@ -5,7 +5,7 @@ import Army from './game/army';
 import Player from './game/player';
 import State from './game/state';
 import Connection from './networking/connection';
-import { ActionMessage, ErrorMessage, StartMessage, StateMessage } from './networking/message';
+import { Message, ActionMessage, ErrorMessage, StartMessage, StateMessage } from './networking/message';
 
 const log = factory.getLogger('Game');
 
@@ -111,16 +111,32 @@ export default class Game extends Connection {
 
       let playerLeftToMove = false;
       for(let id in this.players) {
-        if(!this.players[id].moved) {
+        if(!this.players[id].dead && !this.players[id].moved) {
           playerLeftToMove = true;
           log.info('still a player left to move :/ '+id);
           break;
         }
       }
+      if(playerLeftToMove) {
+        return;
+      }
 
-      if(!playerLeftToMove) {
-        this.processTurn();
-        this.broadcastState();
+      this.processTurn();
+      this.broadcastState();
+
+      // TODO move hardcoded limit to a setting that can be changed
+      if(this.turn >= 199) {
+        this.disconnect();
+      }
+
+      let alivePlayerCount = 0;
+      for(let id in this.players) {
+        if(!this.players[id].dead) {
+          alivePlayerCount++;
+        }
+      }
+      if(alivePlayerCount < 2) {
+        this.disconnect();
       }
     } catch(error) {
       this.send({
