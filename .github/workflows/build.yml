@@ -1,0 +1,48 @@
+name: build
+
+on:
+  push:
+    branches:
+    - master
+    - development
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  NODE_VERSION: 12.x
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+
+    - name: Extract branch name
+      id: extract_branch
+      run: echo ::set-env name=BRANCH::$(echo ${GITHUB_REF#refs/heads/})
+
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Use Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{env.NODE_VERSION}}
+
+    - name: Lint
+      run: npm run lint
+
+    - name: Install
+      run: npm install
+
+    - name: Compile
+      run: npm run build
+
+    - name: Docker
+      uses: elgohr/Publish-Docker-Github-Action@master
+      with:
+        name: wartemis/engine-planet-wars
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+        tags: "${{ env.BRANCH }}"

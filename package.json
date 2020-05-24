@@ -5,8 +5,8 @@
   "main": "dist/app.js",
   "scripts": {
     "start": "tsc && node dist/app.js",
-    "build": "tslint --project . && tsc",
-    "lint": "tslint --project ."
+    "lint": "tslint --project .",
+    "build": "tsc",
   },
   "repository": {
     "type": "git",
