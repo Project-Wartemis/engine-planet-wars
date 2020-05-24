@@ -32,6 +32,7 @@ export interface StartMessage extends Message {
 }
 
 export interface StateMessage extends Message {
+  turn: number;
   players: Array<number>;
   state: State;
 }

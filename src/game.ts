@@ -11,6 +11,7 @@ const log = factory.getLogger('Game');
 
 export default class Game extends Connection {
 
+  private turn = 0;
   private planets: Record<number,Planet> = {};
   private armies: Record<number,Army[]> = {}; // maps a planet id to a list of armies, only used for fights
   private players: Record<number,Player> = {};
@@ -39,6 +40,7 @@ export default class Game extends Connection {
     }
     this.send({
       type: 'state',
+      turn: this.turn,
       players,
       state: this.state,
     } as StateMessage);
@@ -160,14 +162,20 @@ export default class Game extends Connection {
 
   private processTurn(): void {
     log.info('processing next turn');
+    this.turn++;
     // planets
     for(const planet of this.state.planets) {
       this.processPlanet(planet);
     }
-    // moves
+    // new moves
     for(const move of this.queuedMoves) {
       this.processNewMove(move);
     }
+    // armies
+    for(const planet of this.state.planets) {
+      this.initialiseArmy(planet);
+    }
+    // moves
     for(const move of this.state.moves) {
       this.processMove(move);
     }
@@ -188,10 +196,6 @@ export default class Game extends Connection {
     if(planet.player) {
       planet.ships++;
     }
-    this.armies[planet.id] = [{
-      player: planet.player,
-      ships: planet.ships,
-    } as Army];
   }
 
   private processNewMove(move: Move): void {
@@ -199,12 +203,19 @@ export default class Game extends Connection {
     this.state.moves.push(move);
   }
 
+  private initialiseArmy(planet: Planet): void {
+    this.armies[planet.id] = [{
+      player: planet.player,
+      ships: planet.ships,
+    } as Army];
+  }
+
   private processMove(move: Move): void {
     move.turns--;
     if(move.turns) {
       return;
     }
-    const match = this.armies[move.target].find(a => a.player === move.player)
+    const match = this.armies[move.target].find(a => a.player === move.player);
     if(match) {
       match.ships += move.ships;
     } else {
@@ -217,6 +228,8 @@ export default class Game extends Connection {
 
   private processFight(planet: Planet): void {
     if(this.armies[planet.id].length < 2) {
+      planet.ships = this.armies[planet.id][0].ships;
+      planet.player = this.armies[planet.id][0].player;
       return;
     }
     this.armies[planet.id].sort((a,b) => b.ships - a.ships);
