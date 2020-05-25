@@ -128,7 +128,7 @@ export default class Game extends Connection {
       this.broadcastState();
 
       // TODO move hardcoded limit to a setting that can be changed
-      if(this.turn >= 199) {
+      if(this.turn >= 999) {
         this.disconnect();
       }
 
