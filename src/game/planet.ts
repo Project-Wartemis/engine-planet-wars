@@ -3,6 +3,6 @@ export default interface Planet {
   name: string;
   x: number;
   y: number;
-  player: number;
+  player: string;
   ships: number;
 }

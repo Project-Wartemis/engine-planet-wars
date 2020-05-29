@@ -2,7 +2,7 @@ export default interface Move {
   id: number;
   source: number;
   target: number;
-  player: number;
+  player: string;
   ships: number;
   turns: number;
 }

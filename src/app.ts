@@ -1,6 +1,6 @@
 import Game from './game';
 import Connection from './networking/connection';
-import { InviteMessage } from './networking/message';
+import { ActionMessage, StartMessage } from './networking/message';
 import { factory } from './log';
 
 const log = factory.getLogger('App');
@@ -13,11 +13,26 @@ if(process.env.WARTEMIS_ENV === 'BUILD') {
   URL = 'https://pw-backend/socket';
 }
 
-new Connection(URL)
-  .registerHandler('invite', handleInviteMessage);
+const games: Map<number, Game> = new Map();
 
-function handleInviteMessage(raw: object): void {
-  const message: InviteMessage = Object.assign({} as InviteMessage, raw);
-  const game = new Game(URL + '/' + message.room);
-  log.info(`Started a new game @ ${game.url}`);
+const connection = new Connection(URL)
+  .registerHandler('start', handleStartMessage)
+  .registerHandler('action', handleActionMessage);
+
+function handleStartMessage(raw: object): void {
+  const message: StartMessage = Object.assign({} as StartMessage, raw);
+  const game = new Game(message.game, message.prefix, message.suffix, connection);
+  games.set(message.game, game);
+  log.info(`Started a new game [${message.game}]`);
+  game.handleStartMessage(message);
+}
+
+function handleActionMessage(raw: object): void {
+  const message: ActionMessage = Object.assign({} as ActionMessage, raw);
+  const game = games.get(message.game);
+  if(!game) {
+    log.warn(`Game with id [${message.game}] could not be found. This is unexpected.`);
+    return;
+  }
+  game.handleActionMessage(message);
 }

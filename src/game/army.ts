@@ -1,4 +1,4 @@
 export default interface Army {
-  player: number;
+  player: string;
   ships: number;
 }

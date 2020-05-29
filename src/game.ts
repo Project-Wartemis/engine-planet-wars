@@ -5,16 +5,17 @@ import Army from './game/army';
 import Player from './game/player';
 import State from './game/state';
 import Connection from './networking/connection';
-import { ActionMessage, ErrorMessage, StartMessage, StateMessage } from './networking/message';
+import { ActionMessage, ErrorMessage, StartMessage, StateMessage, StopMessage } from './networking/message';
 
 const log = factory.getLogger('Game');
 
-export default class Game extends Connection {
+export default class Game {
 
   private turn = 0;
+  private neutralId: string;
   private planets: Map<number, Planet> =  new Map();
   private armies: Map<number, Army[]> = new Map(); // maps a planet id to a list of armies, only used for fights
-  private players: Map<number, Player> = new Map();
+  private players: Map<string, Player> = new Map();
   private queuedMoves: Move[] = [];
   private state: State = {
     players: [],
@@ -24,50 +25,70 @@ export default class Game extends Connection {
   private moveIdCounter = 0;
 
   constructor(
-    public url: string,
+    private gameId: number,
+    private prefix: string,
+    private suffix: string,
+    private connection: Connection,
   ) {
-    super(url);
-    this.registerHandler('start', this.handleStartMessage.bind(this));
-    this.registerHandler('action', this.handleActionMessage.bind(this));
+    this.neutralId = this.paddify(0);
   }
 
   private broadcastState(): void {
-    const players: number[] = [];
+    // TODO move hardcoded limit to a setting that can be changed
+    let alivePlayerCount = 0;
+    for(const p of this.players.values()) {
+      if(!p.dead) {
+        alivePlayerCount++;
+      }
+    }
+    if(this.turn >= 999 || alivePlayerCount < 2) {
+      this.stop();
+    }
+    const players: Array<string> = [];
     for(const player of this.players.values()) {
       if(!player.moved) {
         players.push(player.id);
       }
     }
-    this.send({
+    this.connection.send({
       type: 'state',
+      game: this.gameId,
       turn: this.turn,
       players,
       state: this.state,
     } as StateMessage);
   }
 
-  private handleStartMessage(raw: object): void {
-    log.info('Starting new game!');
+  private stop(): void {
+    log.info('stopping game ' + this.gameId);
+    this.connection.send({
+      type: 'stop',
+      game: this.gameId,
+    } as StopMessage);
+  }
+
+  private paddify(id: number): string {
+    return this.prefix + id + this.suffix;
+  }
+
+  public handleStartMessage(message: StartMessage): void {
     // some configs - TODO move this to the startmessage?
     const planetCount = 10;
     const width = 50;
     const height = 50;
 
-    const message: StartMessage = Object.assign({} as StartMessage, raw);
-
     // players
-    console.log(message.players);
     for(const id of message.players) {
-      this.players.set(id, {
-        id,
+      this.players.set(this.paddify(id), {
+        id: this.paddify(id),
         moved: false,
         dead: false,
       } as Player);
     }
 
     // neutral player
-    this.players.set(0, {
-      id: 0,
+    this.players.set(this.neutralId, {
+      id: this.neutralId,
       moved: true,
       dead: true,
     } as Player);
@@ -78,7 +99,7 @@ export default class Game extends Connection {
         name: 'planet' + i,
         x: Math.random() * width,
         y: Math.random() * height,
-        player: i < planetCount - message.players.length ? 0 : message.players[planetCount - i - 1],
+        player: i < planetCount - message.players.length ? this.neutralId : this.paddify(message.players[planetCount - i - 1]),
         ships: 5,
       } as Planet);
     });
@@ -95,9 +116,8 @@ export default class Game extends Connection {
     this.broadcastState();
   }
 
-  private handleActionMessage(raw: object): void {
+  public handleActionMessage(message: ActionMessage): void {
     try {
-      const message: ActionMessage = Object.assign({} as ActionMessage, raw);
       const player = this.players.get(message.player);
       if(!player) {
         return;
@@ -126,23 +146,8 @@ export default class Game extends Connection {
 
       this.processTurn();
       this.broadcastState();
-
-      // TODO move hardcoded limit to a setting that can be changed
-      if(this.turn >= 999) {
-        this.disconnect();
-      }
-
-      let alivePlayerCount = 0;
-      for(const p of this.players.values()) {
-        if(!p.dead) {
-          alivePlayerCount++;
-        }
-      }
-      if(alivePlayerCount < 2) {
-        this.disconnect();
-      }
     } catch(error) {
-      this.send({
+      this.connection.send({
         type: 'error',
         content: 'error while processing the move, please check your formatting'
       } as ErrorMessage);
@@ -150,7 +155,7 @@ export default class Game extends Connection {
     }
   }
 
-  private validateAndFillMove(player: number, move: Move): boolean {
+  private validateAndFillMove(player: string, move: Move): boolean {
     if(move.target === move.source) {
       return false; // this makes no sense
     }
@@ -212,7 +217,7 @@ export default class Game extends Connection {
 
   private processPlanet(planet: Planet): void {
     // grow and reset armies
-    if(planet.player) {
+    if(planet.player !== this.neutralId) {
       planet.ships++;
     }
   }
@@ -268,11 +273,11 @@ export default class Game extends Connection {
     }
     armies.sort((a, b) => b.ships - a.ships);
     planet.ships = armies[0].ships - armies[1].ships;
-    planet.player = planet.ships === 0 ? 0 : armies[0].player;
+    planet.player = planet.ships === 0 ? this.neutralId : armies[0].player;
   }
 
   private processPlayer(player: Player): void {
-    if(!player.id) {
+    if(player.id === this.neutralId) {
       return; // do not update neutral player
     }
     player.dead = true;

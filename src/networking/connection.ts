@@ -63,8 +63,8 @@ export default class Connection {
     }
     const raw: object = JSON.parse(iMessage.utf8Data);
     const message: Message = Object.assign({} as Message, raw);
-    log.info(`Got a ${message.type} message!`);
-    log.info(JSON.stringify(message));
+    log.debug(`Got a ${message.type} message!`);
+    log.debug(() => JSON.stringify(message));
     let handler = this.handlers[message.type];
     if(!handler) {
       handler = this.handleDefault.bind(this);
