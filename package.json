@@ -2,9 +2,9 @@
   "name": "pw-engine-planetwars",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/app.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "tsc && node dist/app.js",
+    "start": "tsc && node dist/index.js",
     "lint": "tslint --project .",
     "build": "tsc"
   },
@@ -20,12 +20,13 @@
   "homepage": "https://github.com/Project-Wartemis/pw-engine-planetwars#readme",
   "dependencies": {
     "typescript-logging": "^0.6.4",
+    "wartemis": "^1.0.6",
     "websocket": "^1.0.31"
   },
   "devDependencies": {
     "@types/websocket": "^1.0.0",
     "tslint": "^6.1.2",
-    "tslint-etc": "^1.10.1",
-    "typescript": "^3.9.3"
+    "tslint-etc": "^1.11.1",
+    "typescript": "^3.9.5"
   }
 }
