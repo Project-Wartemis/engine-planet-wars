@@ -8,4 +8,4 @@ RUN npm ci --only=production
 
 COPY dist/. .
 
-CMD [ "node", "app.js" ]
+CMD [ "node", "index.js" ]
