@@ -1,5 +1,5 @@
 {
-  "extends": ["tslint-etc", "tslint:recommended"],
+  "extends": ["tslint:recommended"],
   "rules": {
     "align": {
       "options": [
@@ -56,7 +56,6 @@
     "no-non-null-assertion": true,
     "no-redundant-jsdoc": true,
     "no-switch-case-fall-through": true,
-    "no-unused-declaration": true,
     "no-var-requires": false,
     "object-literal-key-quotes": [
       true,
