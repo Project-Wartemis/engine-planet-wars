@@ -36,7 +36,7 @@ jobs:
       run: npm run build
 
     - name: Docker
-      uses: elgohr/Publish-Docker-Github-Action@master
+      uses: elgohr/Publish-Docker-Github-Action@v5
       with:
         name: wartemis/engine-planet-wars
         username: ${{ secrets.DOCKERHUB_USERNAME }}
